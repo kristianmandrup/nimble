@@ -1,8 +1,8 @@
 import common, options, strutils, osproc, strscans
 import bump
 
-proc writeNewVersion(newVersion: string) =
-  discard bump.bump(manual = "1.2.3", message = @["goats", "are", "sexy"])
+proc writeNewVersion(newVersion: string, message: seq[string] = @[]) =
+  discard bump.bump(manual = newVersion, message = message)
 
 proc execGitCommand*(commandStr: string) =
   let gitCmdStr = "git" & commandStr
