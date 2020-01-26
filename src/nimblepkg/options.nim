@@ -36,19 +36,19 @@ type
     actionInstall, actionSearch,
     actionList, actionBuild, actionPath, actionUninstall, actionCompile,
     actionDoc, actionCustom, actionTasks, actionDevelop, actionCheck,
-    actionRun
+    actionRun, actionTag
 
   Action* = object
     case typ*: ActionType
-    of actionNil, actionList, actionPublish, actionTasks, actionCheck: nil
+    of actionNil, actionList, actionTasks, actionCheck: nil
     of actionRefresh:
-      optionalURL*: string # Overrides default package list.
+      optionalURL*: string     # Overrides default package list.
     of actionInstall, actionPath, actionUninstall, actionDevelop:
       packages*: seq[PkgTuple] # Optional only for actionInstall
                                # and actionDevelop.
       passNimFlags*: seq[string]
     of actionSearch:
-      search*: seq[string] # Search string.
+      search*: seq[string]     # Search string.
     of actionInit, actionDump:
       projName*: string
       vcsOption*: string
@@ -56,6 +56,8 @@ type
       file*: string
       backend*: string
       compileOptions: seq[string]
+    of actionPublish, actionTag:
+      tag*: string
     of actionRun:
       runFile: Option[string]
       compileFlags: seq[string]
@@ -83,9 +85,12 @@ Commands:
                                   new directory of the same name.
                --git
                --hg               Create a git or hg repo in the new nimble project.
+  tag          [version]          Tags repo with a given version and puses tag to remote repo. 
+                                  If no version given, uses version from nimble file
   publish                         Publishes a package on nim-lang/packages.
                                   The current working directory needs to be the
                                   toplevel directory of the Nimble package.
+               --tag              Additionally tags and pushes tags to remote repo before publish
   uninstall    [pkgname, ...]     Uninstalls a list of packages.
                [-i, --inclDeps]   Uninstall package and dependent package(s).
   build        [opts, ...] [bin]  Builds a package.
@@ -136,7 +141,7 @@ For more information read the Github readme:
 
 const noHookActions* = {actionCheck}
 
-proc writeHelp*(quit=true) =
+proc writeHelp*(quit = true) =
   echo(help)
   if quit:
     raise NimbleQuit(msg: "")
@@ -180,6 +185,8 @@ proc parseActionType*(action: string): ActionType =
     result = actionUninstall
   of "publish":
     result = actionPublish
+  of "tag":
+    result = actionTag
   of "tasks":
     result = actionTasks
   of "develop":
@@ -217,8 +224,10 @@ proc initAction*(options: var Options, key: string) =
     options.action.command = key
     options.action.arguments = @[]
     options.action.flags = newStringTable()
-  of actionPublish, actionList, actionTasks, actionCheck, actionRun,
-     actionNil: discard
+  of actionPublish, actionTag:
+    options.action.tag = ""
+  of actionList, actionTasks, actionCheck, actionRun, actionNil: discard
+
 
 proc prompt*(options: Options, question: string): bool =
   ## Asks an interactive question and returns the result.
@@ -234,7 +243,8 @@ proc promptCustom*(options: Options, question, default: string): string =
   ## forcePrompts is forcePromptYes.
   return promptCustom(options.forcePrompts, question, default)
 
-proc promptList*(options: Options, question: string, args: openarray[string]): string =
+proc promptList*(options: Options, question: string, args: openarray[
+    string]): string =
   ## Asks an interactive question and returns the result.
   ##
   ## The proc will return one of the provided args. If not prompting the first
@@ -298,7 +308,7 @@ proc parseArgument*(key: string, result: var Options) =
     result.action.projName = key
   of actionCompile, actionDoc:
     result.action.file = key
-  of actionList, actionPublish:
+  of actionList:
     result.showHelp = true
   of actionBuild:
     result.action.file = key
@@ -306,6 +316,11 @@ proc parseArgument*(key: string, result: var Options) =
     result.setRunOptions(key, key, true)
   of actionCustom:
     result.action.arguments.add(key)
+  of actionTag:
+    result.action.tag = key
+  of actionPublish:
+    result.action.tag = key
+    result.showHelp = true
   else:
     discard
 
@@ -444,7 +459,7 @@ proc parseCmdLine*(): Options =
       else:
         parseArgument(key, result)
     of cmdLongOption, cmdShortOption:
-        parseFlag(key, val, result, kind)
+      parseFlag(key, val, result, kind)
     of cmdEnd: assert(false) # cannot happen
 
   handleUnknownFlags(result)

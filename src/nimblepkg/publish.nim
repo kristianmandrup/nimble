@@ -6,12 +6,12 @@
 
 import system except TResult
 import httpclient, strutils, json, os, browsers, times, uri
-import version, tools, common, cli, config, options
+import version, tools, common, cli, config, options, tag
 
 type
   Auth = object
     user: string
-    token: string  ## Github access token
+    token: string    ## Github access token
     http: HttpClient ## http client for doing API requests
 
 const
@@ -43,7 +43,7 @@ proc requestNewToken(cfg: Config): string =
   let token = promptCustom("Personal access token?", "").strip()
   # inform the user that their token will be written to disk
   let tokenWritePath = cfg.nimbleDir / ApiKeyFile
-  display("Info:", "Writing access token to file:" & tokenWritePath, 
+  display("Info:", "Writing access token to file:" & tokenWritePath,
           priority = HighPriority)
   writeFile(tokenWritePath, token)
   sleep(3000)
@@ -55,7 +55,7 @@ proc getGithubAuth(o: Options): Auth =
   # always prefer the environment variable to asking for a new one
   if existsEnv(ApiTokenEnvironmentVariable):
     result.token = getEnv(ApiTokenEnvironmentVariable)
-    display("Info:", "Using the '" & ApiTokenEnvironmentVariable & 
+    display("Info:", "Using the '" & ApiTokenEnvironmentVariable &
             "' environment variable for the GitHub API Token.",
             priority = HighPriority)
   else:
@@ -97,7 +97,7 @@ proc createFork(a: Auth) =
 proc createPullRequest(a: Auth, packageName, branch: string): string =
   display("Info", "Creating PR", priority = HighPriority)
   var body = a.http.postContent(ReposUrl & "nim-lang/packages/pulls",
-      body="""{"title": "Add package $1", "head": "$2:$3",
+      body = """{"title": "Add package $1", "head": "$2:$3",
                "base": "master"}""" % [packageName, a.user, branch])
   var pr = parseJson(body)
   return pr{"html_url"}.getStr()
@@ -152,7 +152,9 @@ proc editJson(p: PackageInfo; url, tags, downloadMethod: string) =
   })
   writeFile("packages.json", contents.pretty.cleanupWhitespace)
 
-proc publish*(p: PackageInfo, o: Options) =
+proc publish*(p: PackageInfo, options: Options) =
+  tagRepo(p, options)
+
   ## Publishes the package p.
   let auth = getGithubAuth(o)
   var pkgsDir = getNimbleUserTempDir() / "nimble-packages-fork"
@@ -171,7 +173,8 @@ proc publish*(p: PackageInfo, o: Options) =
   cd pkgsDir:
     # Avoid git clone to prevent token from being stored in repo
     # https://github.com/blog/1270-easier-builds-and-deployments-using-git-over-https-and-oauth
-    display("Copying", "packages fork into: " & pkgsDir, priority = HighPriority)
+    display("Copying", "packages fork into: " & pkgsDir,
+        priority = HighPriority)
     doCmd("git init")
     doCmd("git pull https://github.com/" & auth.user & "/packages")
     # Make sure to update the fork
@@ -224,6 +227,7 @@ proc publish*(p: PackageInfo, o: Options) =
     doCmd("git checkout -B " & branchName)
     doCmd("git commit packages.json -m \"Added package " & p.name & "\"")
     display("Pushing", "to remote of fork.", priority = HighPriority)
-    doCmd("git push https://" & auth.token & "@github.com/" & auth.user & "/packages " & branchName)
+    doCmd("git push https://" & auth.token & "@github.com/" & auth.user &
+        "/packages " & branchName)
     let prUrl = createPullRequest(auth, p.name, branchName)
-  display("Success:", "Pull request successful, check at " & prUrl , Success, HighPriority)
+  display("Success:", "Pull request successful, check at " & prUrl, Success, HighPriority)
