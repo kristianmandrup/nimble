@@ -1,4 +1,8 @@
-import common, options, strutils, osproc
+import common, options, strutils, osproc, strscans
+import bump
+
+proc writeNewVersion(newVersion: string) =
+  discard bump.bump(manual = "1.2.3", message = @["goats", "are", "sexy"])
 
 proc execGitCommand*(commandStr: string) =
   let gitCmdStr = "git" & commandStr
@@ -6,33 +10,44 @@ proc execGitCommand*(commandStr: string) =
   if errCode != 0:
     raise newException(OSError, $errorMsg)
 
-proc vNum(numStr: string): int =
-  try:
-    result = if numStr.len == 0: 0 else: strutils.parseInt(numStr)
-  except:
-    result = 0
-
 proc createVersion(n0, n1, n2: int): string =
   $n0 & "." & $n1 & "." & $n2
 
-proc tagRepo*(pkg: PackageInfo, options: Options) =
+proc extractSemVerParts(versionStr: string): tuple[major, minor, patch: int] =
+  var
+    major, minor, patch: int
+  discard versionStr.scanf("$i.$i.$i", major, minor, patch)
+  return (major, minor, patch)
+
+proc incVersion(version: string, semVer: tuple[major, minor, patch: int],
+    optVersion: string): string =
+  var (major, minor, patch) = semVer
+  var newVersion = ""
+  case optVersion:
+    of "patch", ".":
+      newVersion = createVersion(major, minor, patch + 1)
+    of "minor", "m":
+      newVersion = createVersion(major, minor + 1, 0)
+    of "major", "M":
+      newVersion = createVersion(major + 1, 0, 0)
+  if newVersion.len > 0:
+    writeNewVersion(newVersion)
+    result = newVersion
+  else:
+    result = version
+
+proc calcTagVersion(pkg: PackageInfo, options: Options): string =
   let optVersion = strutils.strip(options.action.tag)
   var version = optVersion
   var pkgVersion = pkg.version
-
-  let vArr = pkgVersion.split(".")
-  var (major, minor, patch) = (vNum(vArr[0]), vNum(vArr[1]), vNum(vArr[2]))
-
-  case optVersion:
-    of "patch", ".":
-      version = createVersion(major, minor, patch + 1)
-    of "minor", "m":
-      version = createVersion(major, minor + 1, 0)
-    of "major", "M":
-      version = createVersion(major + 1, 0, 0)
-
+  var semVer = extractSemVerParts(pkgVersion)
+  version = incVersion(version, semVer, optVersion)
   if version.len == 0:
     version = pkgVersion
+  return version
+
+proc tagRepo*(pkg: PackageInfo, options: Options) =
+  var version = calcTagVersion(pkg, options)
   let tagVersion = "v" & version
   execGitCommand("tag " & tagVersion)
   execGitCommand("push origin master --tags")

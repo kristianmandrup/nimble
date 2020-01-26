@@ -217,7 +217,7 @@ proc multiSplit(s: string): seq[string] =
     else:
       return @[]
 
-proc readPackageInfoFromNimble(path: string; result: var PackageInfo) =
+proc readPackageInfoFromNimble*(path: string; result: var PackageInfo) =
   var fs = newFileStream(path, fmRead)
   if fs != nil:
     var p: CfgParser
@@ -257,7 +257,8 @@ proc readPackageInfoFromNimble(path: string; result: var PackageInfo) =
           of "bin":
             for i in ev.value.multiSplit:
               if i.splitFile().ext == ".nim":
-                raise newException(NimbleError, "`bin` entry should not be a source file: " & i)
+                raise newException(NimbleError,
+                    "`bin` entry should not be a source file: " & i)
               result.bin.add(i.addFileExt(ExeExt))
           of "backend":
             result.backend = ev.value.toLowerAscii()
@@ -316,7 +317,7 @@ proc inferInstallRules(pkgInfo: var PackageInfo, options: Options) =
       pkgInfo.installFiles.add(pkgInfo.name.addFileExt("nim"))
 
 proc readPackageInfo(nf: NimbleFile, options: Options,
-    onlyMinimalInfo=false): PackageInfo =
+    onlyMinimalInfo = false): PackageInfo =
   ## Reads package info from the specified Nimble file.
   ##
   ## Attempts to read it using the "old" Nimble ini format first, if that
@@ -453,7 +454,7 @@ proc getInstalledPkgs*(libsDir: string, options: Options):
         let meta = readMetaData(path)
         var pkg: PackageInfo
         try:
-          pkg = readPackageInfo(nimbleFile, options, onlyMinimalInfo=false)
+          pkg = readPackageInfo(nimbleFile, options, onlyMinimalInfo = false)
         except ValidationError:
           let exc = (ref ValidationError)(getCurrentException())
           exc.msg = createErrorMsg(validationErrorMsg, path, exc.msg)

@@ -21,6 +21,35 @@ proc writeExampleIfNonExistent(file: string, content: string) =
     display("Info:", "File " & file & " already exists, did not write " &
             "example code", priority = HighPriority)
 
+proc writeNimbleFile*(info: PkgInitInfo, pkgRoot: string,
+    nimbleFileOptions: string) =
+  # Write the nimble file
+  let nimbleFile = pkgRoot / info.pkgName.changeFileExt("nimble")
+  # Only write backend if it isn't "c"
+  var pkgBackend = ""
+  if (info.pkgBackend != "c"):
+    pkgBackend = "backend       = " & info.pkgbackend.escape()
+  writeFile(nimbleFile, """# Package
+
+version       = $#
+author        = "$#"
+description   = "$#"
+license       = $#
+srcDir        = $#
+$#
+$#
+
+# Dependencies
+
+requires "nim >= $#"
+""" % [
+      info.pkgVersion.escape(), info.pkgAuthor.replace("\"", "\\\""),
+          info.pkgDesc.replace("\"", "\\\""),
+      info.pkgLicense.escape(), info.pkgSrcDir.escape(), nimbleFileOptions,
+      pkgBackend, info.pkgNimDep
+    ]
+  )
+
 proc createPkgStructure*(info: PkgInitInfo, pkgRoot: string) =
   # Create source directory
   createDirD(pkgRoot / info.pkgSrcDir)
@@ -31,7 +60,7 @@ proc createPkgStructure*(info: PkgInitInfo, pkgRoot: string) =
   of "binary":
     let mainFile = pkgRoot / info.pkgSrcDir / info.pkgName.changeFileExt("nim")
     writeExampleIfNonExistent(mainFile,
-"""
+    """
 # This is just an example to get you started. A typical binary package
 # uses this file as the main entry point of the application.
 
@@ -43,7 +72,7 @@ when isMainModule:
   of "library":
     let mainFile = pkgRoot / info.pkgSrcDir / info.pkgName.changeFileExt("nim")
     writeExampleIfNonExistent(mainFile,
-"""
+    """
 # This is just an example to get you started. A typical library package
 # exports the main API in this file. Note that you cannot rename this file
 # but you can remove it if you wish.
@@ -58,7 +87,7 @@ proc add*(x, y: int): int =
     let submodule = pkgRoot / info.pkgSrcDir / info.pkgName /
         "submodule".addFileExt("nim")
     writeExampleIfNonExistent(submodule,
-"""
+    """
 # This is just an example to get you started. Users of your library will
 # import this file by writing ``import $1/submodule``. Feel free to rename or
 # remove this file altogether. You may create additional modules alongside
@@ -76,7 +105,7 @@ proc initSubmodule*(): Submodule =
   of "hybrid":
     let mainFile = pkgRoot / info.pkgSrcDir / info.pkgName.changeFileExt("nim")
     writeExampleIfNonExistent(mainFile,
-"""
+    """
 # This is just an example to get you started. A typical hybrid package
 # uses this file as the main entry point of the application.
 
@@ -91,7 +120,7 @@ when isMainModule:
     createDirD(pkgSubDir)
     let submodule = pkgSubDir / "submodule".addFileExt("nim")
     writeExampleIfNonExistent(submodule,
-"""
+    """
 # This is just an example to get you started. Users of your hybrid library will
 # import this file by writing ``import $1pkg/submodule``. Feel free to rename or
 # remove this file altogether. You may create additional modules alongside
@@ -120,7 +149,7 @@ proc getWelcomeMessage*(): string = "Hello, World!"
 
     if info.pkgType == "library":
       writeExampleIfNonExistent(pkgTestPath / "test1".addFileExt("nim"),
-"""
+      """
 # This is just an example to get you started. You may wish to put all of your
 # tests into a single file, or separate them into multiple `test1`, `test2`
 # etc. files (better names are recommended, just make sure the name starts with
@@ -137,7 +166,7 @@ test "can add":
       )
     else:
       writeExampleIfNonExistent(pkgTestPath / "test1".addFileExt("nim"),
-"""
+      """
 # This is just an example to get you started. You may wish to put all of your
 # tests into a single file, or separate them into multiple `test1`, `test2`
 # etc. files (better names are recommended, just make sure the name starts with
@@ -155,30 +184,7 @@ test "correct welcome":
   else:
     assert false, "Invalid package type specified."
 
-  # Write the nimble file
-  let nimbleFile = pkgRoot / info.pkgName.changeFileExt("nimble")
-  # Only write backend if it isn't "c"
-  var pkgBackend = ""
-  if (info.pkgBackend != "c"):
-    pkgBackend = "backend       = " & info.pkgbackend.escape()
-  writeFile(nimbleFile, """# Package
+  writeNimbleFile(info, pkgRoot, nimbleFileOptions)
 
-version       = $#
-author        = "$#"
-description   = "$#"
-license       = $#
-srcDir        = $#
-$#
-$#
-
-# Dependencies
-
-requires "nim >= $#"
-""" % [
-      info.pkgVersion.escape(), info.pkgAuthor.replace("\"", "\\\""), info.pkgDesc.replace("\"", "\\\""),
-      info.pkgLicense.escape(), info.pkgSrcDir.escape(), nimbleFileOptions,
-      pkgBackend, info.pkgNimDep
-    ]
-  )
-
-  display("Info:", "Nimble file created successfully", priority=MediumPriority)
+  display("Info:", "Nimble file created successfully",
+      priority = MediumPriority)

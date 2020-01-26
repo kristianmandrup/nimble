@@ -12,8 +12,8 @@ when not defined(nimscript):
   type
     BuildFailed* = object of NimbleError
 
-    PackageInfo* = object
-      myPath*: string ## The path of this .nimble file
+    PackageInfo* = ref object
+      myPath*: string    ## The path of this .nimble file
       isNimScript*: bool ## Determines if this pkg info was read from a nims file
       isMinimal*: bool
       isInstalled*: bool ## Determines if the pkg this info belongs to is installed

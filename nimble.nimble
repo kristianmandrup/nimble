@@ -11,7 +11,7 @@ installExt = @["nim"]
 
 # Dependencies
 
-requires "nim >= 0.13.0"
+requires "nim >= 0.13.0", "bump"
 
 when defined(nimdistros):
   import distros
