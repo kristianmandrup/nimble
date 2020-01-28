@@ -35,6 +35,12 @@ proc extractSemVerParts(versionStr: string): tuple[major, minor, patch: int] =
   discard versionStr.scanf("$i.$i.$i", major, minor, patch)
   return (major, minor, patch)
 
+proc isValidSemVer(version: string): bool =
+  match(version, re"^(\d+)$") or
+  match(version, re"^(\d+)(\.\d+)$") or
+  match(version, re"^(\d+)(\.\d+)(\.\d+)$") or
+  match(version, re"^(\d+)(\.\d+)(\.\d+)-(\w+)(\d+)?$")
+
 proc incVersion(version: string, semVer: tuple[major, minor, patch: int],
 optVersion: string): string =
   var (major, minor, patch) = semVer
@@ -47,7 +53,11 @@ optVersion: string): string =
     of "major", "M":
       newVersion = createVersion(major + 1, 0, 0)
     else:
-      newVersion = version
+      if isValidSemVer(optVersion):
+        newVersion = optVersion
+      else:
+        raise Exception("Invalid version: " & optVersion)
+        # newVersion = version
 
 proc incPkgVersion(pkg: PackageInfo, version: string, semVer: tuple[major,
     minor, patch: int], optVersion: string): string =
