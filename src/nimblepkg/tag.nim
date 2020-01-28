@@ -1,8 +1,17 @@
-import common, options, strutils, osproc, strscans
-import bump
+import common, options, strutils, osproc, strscans, re
 
-proc writeNewVersion(newVersion: string, message: seq[string] = @[]) =
-  discard bump.bump(manual = newVersion, message = message)
+proc replaceVersionInNimblePkgStr(nimbleStr: string,
+    newVersion: string): string =
+  let xpr = re"""(version\s+=\s+")(\S+)"""
+  let newNimblePkgStr = nimbleStr.replacef(xpr, "$#" & newVersion & "\"")
+  newNimblePkgStr
+
+proc writeNewVersion(pkg: PackageInfo, newVersion: string,
+    message: string = "") =
+  let nimbleFilePath = pkg.myPath
+  let nimblePkgStr = readFile(nimbleFilePath)
+  let newNimblePkgStr = replaceVersionInNimblePkgStr(nimblePkgStr, newVersion)
+  writeFile(nimbleFilePath, newNimblePkgStr)
 
 proc execGitCommand*(commandStr: string) =
   let gitCmdStr = "git" & commandStr
@@ -20,7 +29,7 @@ proc extractSemVerParts(versionStr: string): tuple[major, minor, patch: int] =
   return (major, minor, patch)
 
 proc incVersion(version: string, semVer: tuple[major, minor, patch: int],
-    optVersion: string): string =
+optVersion: string): string =
   var (major, minor, patch) = semVer
   var newVersion = ""
   case optVersion:
@@ -30,18 +39,21 @@ proc incVersion(version: string, semVer: tuple[major, minor, patch: int],
       newVersion = createVersion(major, minor + 1, 0)
     of "major", "M":
       newVersion = createVersion(major + 1, 0, 0)
-  if newVersion.len > 0:
-    writeNewVersion(newVersion)
-    result = newVersion
-  else:
-    result = version
+    else:
+      newVersion = version
+
+proc incPkgVersion(pkg: PackageInfo, version: string, semVer: tuple[major,
+    minor, patch: int], optVersion: string): string =
+  let newVersion = incVersion(version, semVer, optVersion)
+  if newVersion != version:
+    writeNewVersion(pkg, newVersion)
 
 proc calcTagVersion(pkg: PackageInfo, options: Options): string =
   let optVersion = strutils.strip(options.action.tag)
   var version = optVersion
   var pkgVersion = pkg.version
   var semVer = extractSemVerParts(pkgVersion)
-  version = incVersion(version, semVer, optVersion)
+  version = incPkgVersion(pkg, version, semVer, optVersion)
   if version.len == 0:
     version = pkgVersion
   return version
