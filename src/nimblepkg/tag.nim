@@ -6,18 +6,25 @@ proc replaceVersionInNimblePkgStr(nimbleStr: string,
   let newNimblePkgStr = nimbleStr.replacef(xpr, "$#" & newVersion & "\"")
   newNimblePkgStr
 
+proc execGitCommand*(commandStr: string) =
+  let gitCmdStr = "git" & commandStr
+  let (errorMsg, errCode) = execCmdEx(gitCmdStr)
+  if errCode != 0:
+    raise newException(OSError, $errorMsg)
+
+proc commitMsgOrVersion(message: string, version: string) =
+  let gitMessage = if message.len > 0: message else: version
+  let cmdStr = "commit -m '" & gitMessage & "'"
+  execGitCommand(cmdStr)
+
+# Note: currently no way to send a custom commit message for the tag. Always simply uses new version number
 proc writeNewVersion(pkg: PackageInfo, newVersion: string,
     message: string = "") =
   let nimbleFilePath = pkg.myPath
   let nimblePkgStr = readFile(nimbleFilePath)
   let newNimblePkgStr = replaceVersionInNimblePkgStr(nimblePkgStr, newVersion)
   writeFile(nimbleFilePath, newNimblePkgStr)
-
-proc execGitCommand*(commandStr: string) =
-  let gitCmdStr = "git" & commandStr
-  let (errorMsg, errCode) = execCmdEx(gitCmdStr)
-  if errCode != 0:
-    raise newException(OSError, $errorMsg)
+  commitMsgOrVersion(message, newVersion)
 
 proc createVersion(n0, n1, n2: int): string =
   $n0 & "." & $n1 & "." & $n2
